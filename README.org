@@ -1,0 +1,5 @@
+#+title: Smaish
+
+A terrible attempt at cloning smash
+
+* TODO Debug fastfall timer
