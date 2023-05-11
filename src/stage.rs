@@ -10,7 +10,7 @@ impl Plugin for StagePlugin {
 }
 
 #[derive(Component)]
-struct Stage;
+pub struct Stage;
 
 fn setup_stage(
     mut commands: Commands,
@@ -29,14 +29,15 @@ fn setup_stage(
 
     commands.spawn((
         PbrBundle {
-            mesh: meshes.add(shape::Plane::from_size(200.).into()),
+            mesh: meshes.add(shape::Plane::from_size(10.).into()),
             material: materials.add(Color::rgb(0.8, 0.7, 0.6).into()),
             ..Default::default()
         },
-        RigidBody::Dynamic, // For moving platforms
+        RigidBody::Fixed, // For moving platforms
         GravityScale(0.),
         Velocity::default(),
-        Collider::cuboid(100., 0.05, 100.),
+        Collider::cuboid(5., 0.05, 5.),
         Stage,
+        ActiveEvents::CONTACT_FORCE_EVENTS,
     ));
 }

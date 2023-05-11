@@ -2,11 +2,15 @@ use bevy::prelude::*;
 use bevy_rapier3d::prelude::*;
 use leafwing_input_manager::prelude::*;
 
+use super::Character;
+
 // Most of these constants will change according to the character.
 // They're placeholders
-const PLAYER_JUMP: f32 = 10.;
-const PLAYER_FAST_FALL: f32 = 5.;
-const PLAYER_SPEED: f32 = 10.;
+// const PLAYER_JUMP: f32 = 10.;
+// const PLAYER_FAST_FALL: f32 = 5.;
+// const PLAYER_SPEED_AIR: f32 = 5.;
+// const PLAYER_SPEED_FLOOR: f32 = 10.;
+const FASTFALL_THRESHOLD: f32 = 0.5;
 
 pub struct PlayerPlugin;
 
@@ -14,10 +18,7 @@ impl Plugin for PlayerPlugin {
     fn build(&self, app: &mut App) {
         app.add_startup_system(setup_player)
             .add_plugin(InputManagerPlugin::<PlayerActions>::default())
-            .add_system(jump)
-            .add_system(fast_fall)
-            .add_system(move_player)
-            .insert_resource(PlayerMovementInfo::default());
+            .add_system(player_movement);
     }
 }
 
@@ -31,12 +32,6 @@ enum PlayerActions {
     NormalAttack,
     SpecialAttack,
     FastFall,
-}
-
-#[derive(Resource, Default)]
-struct PlayerMovementInfo {
-    is_fastfalling: bool,
-    is_on_floor: bool,
 }
 
 fn setup_player(
@@ -60,6 +55,8 @@ fn setup_player(
             ..default()
         },
         LockedAxes::ROTATION_LOCKED,
+        Character::default(),
+        GravityScale(0.5),
     ));
 
     commands
@@ -78,58 +75,37 @@ fn setup_player(
         .insert(Player);
 }
 
-fn jump(
-    jump_query: Query<&ActionState<PlayerActions>, With<Player>>,
-    mut player_query: Query<&mut Velocity, With<Player>>,
-    mut info: ResMut<PlayerMovementInfo>,
-) {
-    let action_state = jump_query.single();
-    if !action_state.just_pressed(PlayerActions::Jump) {
-        return;
-    }
-
-    let mut playervl = player_query.single_mut();
-
-    playervl.linvel.y = PLAYER_JUMP;
-
-    info.is_on_floor = false; // TODO
-}
-
-fn fast_fall(
+fn player_movement(
     fastfall_query: Query<&ActionState<PlayerActions>, With<Player>>,
-    mut player_query: Query<&mut Velocity, With<Player>>,
-    mut info: ResMut<PlayerMovementInfo>,
+    mut player_query: Query<&mut Character, With<Player>>,
 ) {
-    let action = fastfall_query.single();
-
-    if !action.just_pressed(PlayerActions::FastFall) {
-        return;
-    }
-
-    let mut playervl = player_query.single_mut();
-
-    playervl.linvel.y = -PLAYER_FAST_FALL;
-
-    info.is_fastfalling = true;
-}
-
-fn move_player(
-    move_query: Query<&ActionState<PlayerActions>, With<Player>>,
-    mut player_query: Query<&mut Velocity, With<Player>>,
-) {
-    let action_state = move_query.single();
-
-    if !action_state.pressed(PlayerActions::Move) {
-        return;
-    }
-
+    let action_state = fastfall_query.single();
     let axis_pair = action_state.clamped_axis_pair(PlayerActions::Move).unwrap();
-    // println!("Move:");
-    // println!("   distance: {}", axis_pair.length());
-    // println!("          x: {}", axis_pair.x());
-    // println!("          y: {}", axis_pair.y());
+    let mut character = player_query.single_mut();
 
-    let mut playervl = player_query.single_mut();
+    if action_state.pressed(PlayerActions::Move) {
+        // Sides
+        character.movement_x = axis_pair.x().clamp(-1., 1.);
 
-    playervl.linvel.x = axis_pair.x() * PLAYER_SPEED;
+        // Fast Fall
+        if !character.is_fastfalling && axis_pair.y() < -FASTFALL_THRESHOLD && character.is_on_air()
+        {
+            character.is_fastfalling = true;
+        }
+    } else {
+        character.movement_x = 0.;
+    }
+
+    // Jump
+    if action_state.just_pressed(PlayerActions::Jump) && character.current_air_jumps > 0 {
+        if !character.is_on_floor() {
+            character.current_air_jumps -= 1;
+        }
+        character.just_jumped = true;
+    }
 }
+
+// println!("Move:");
+// println!("   distance: {}", axis_pair.length());
+// println!("          x: {}", axis_pair.x());
+// println!("          y: {}", axis_pair.y());
