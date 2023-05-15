@@ -2,4 +2,5 @@
 
 A terrible attempt at cloning smash
 
-* TODO Debug fastfall timer
+* DONE Debug fastfall timer
+* TODO Use movement to control fastfall rather than pure stats

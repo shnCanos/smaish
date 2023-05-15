@@ -178,11 +178,9 @@ fn character_touching_stage_check(
 
         // Yandere dev time! Why use anything else, when you can use ELSE IF
         character.is_touching_stage = Some(if contact_force_event.total_force.y < 0. {
-            Wall::Floor
+            Wall::Below
         } else if contact_force_event.total_force.y > 0. {
             Wall::Floor
-        } else if contact_force_event.total_force.y < 0. {
-            Wall::Below
         } else if contact_force_event.total_force.x > 0. {
             Wall::Right
         } else if contact_force_event.total_force.x < 0. {
