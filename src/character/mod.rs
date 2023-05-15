@@ -66,9 +66,8 @@ pub struct Character {
 
     /// A helper to fastfall
     wants_to_fastfall: bool,
-
-    /// final y position  - beginning y position
-    y_position_delta: f32,
+    // final y position  - beginning y position
+    // y_position_delta: f32,
 }
 
 impl Character {
