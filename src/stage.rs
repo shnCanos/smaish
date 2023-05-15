@@ -1,5 +1,5 @@
 use bevy::prelude::*;
-use bevy_rapier3d::prelude::*;
+use bevy_rapier2d::prelude::*;
 
 pub struct StagePlugin;
 
@@ -12,31 +12,19 @@ impl Plugin for StagePlugin {
 #[derive(Component)]
 pub struct Stage;
 
-fn setup_stage(
-    mut commands: Commands,
-    mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
-) {
-    commands.spawn(PointLightBundle {
-        point_light: PointLight {
-            intensity: 1000.,
-            shadows_enabled: true,
+fn setup_stage(mut commands: Commands) {
+    commands.spawn((
+        SpriteBundle {
+            transform: Transform {
+                translation: Vec2::new(0., -100.).extend(0.),
+                ..default()
+            },
             ..default()
         },
-        transform: Transform::from_xyz(3., 2., 3.),
-        ..default()
-    });
-
-    commands.spawn((
-        PbrBundle {
-            mesh: meshes.add(shape::Plane::from_size(10.).into()),
-            material: materials.add(Color::rgb(0.8, 0.7, 0.6).into()),
-            ..Default::default()
-        },
-        RigidBody::Fixed, // For moving platforms
-        GravityScale(0.),
+        RigidBody::Fixed,
+        // GravityScale(0.),
         Velocity::default(),
-        Collider::cuboid(5., 0.05, 5.),
+        Collider::cuboid(500., 50.),
         Stage,
         ActiveEvents::CONTACT_FORCE_EVENTS,
     ));

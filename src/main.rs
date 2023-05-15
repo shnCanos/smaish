@@ -3,7 +3,7 @@ mod character;
 mod stage;
 
 use bevy::prelude::*;
-use bevy_rapier3d::prelude::*;
+use bevy_rapier2d::prelude::*;
 
 fn setup_window(mut window: Query<&mut Window>) {
     let mut window = window.get_single_mut().unwrap();

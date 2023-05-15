@@ -1,5 +1,5 @@
 use bevy::prelude::*;
-use bevy_rapier3d::prelude::*;
+use bevy_rapier2d::prelude::*;
 use leafwing_input_manager::prelude::*;
 
 use super::Character;
@@ -34,29 +34,28 @@ enum PlayerActions {
     FastFall,
 }
 
-fn setup_player(
-    mut commands: Commands,
-    mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
-) {
+fn setup_player(mut commands: Commands, asset_server: Res<AssetServer>) {
+    let character = Character::default();
     commands.spawn((
-        PbrBundle {
-            mesh: meshes.add(Mesh::from(shape::Cube { size: 1.0 })),
-            material: materials.add(Color::rgb(0.8, 0.7, 0.6).into()),
-            transform: Transform::from_xyz(0.0, 0.5, 0.0),
+        SpriteBundle {
+            sprite: Sprite {
+                custom_size: Some(Vec2::new(100., 100.)),
+                ..default()
+            },
+            texture: asset_server.load("bandanadee.png"),
             ..default()
         },
         RigidBody::Dynamic,
         Player,
-        Collider::cuboid(0.5, 0.5, 0.5),
+        Collider::cuboid(50., 50.),
         // GravityScale(10.),
         Velocity {
-            linvel: Vec3::new(0., 0., 0.),
+            linvel: Vec2::ZERO,
             ..default()
         },
         LockedAxes::ROTATION_LOCKED,
-        Character::default(),
-        GravityScale(0.5),
+        character.clone(),
+        GravityScale(character.normal_gravity),
     ));
 
     commands
@@ -90,18 +89,15 @@ fn player_movement(
         // Fast Fall
         if !character.is_fastfalling && axis_pair.y() < -FASTFALL_THRESHOLD && character.is_on_air()
         {
-            character.is_fastfalling = true;
+            character.wants_to_fastfall = true;
         }
     } else {
         character.movement_x = 0.;
     }
 
     // Jump
-    if action_state.just_pressed(PlayerActions::Jump) && character.current_air_jumps > 0 {
-        if !character.is_on_floor() {
-            character.current_air_jumps -= 1;
-        }
-        character.just_jumped = true;
+    if action_state.just_pressed(PlayerActions::Jump) {
+        character.wants_to_jump = true;
     }
 }
 
