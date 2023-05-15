@@ -22,7 +22,6 @@ pub enum Wall {
     Right,
     Floor,
     Below,
-    Unknown, //If this value appears, might as well be an error
 }
 
 #[derive(Component, Debug, Clone)]
@@ -186,7 +185,7 @@ fn character_touching_stage_check(
         } else if contact_force_event.total_force.x < 0. {
             Wall::Left
         } else {
-            Wall::Unknown
+            panic!("Wall is unknown!");
         });
 
         if let Wall::Floor = character.is_touching_stage.unwrap() {
