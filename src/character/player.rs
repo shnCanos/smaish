@@ -11,6 +11,8 @@ use super::Character;
 // const PLAYER_SPEED_AIR: f32 = 5.;
 // const PLAYER_SPEED_FLOOR: f32 = 10.;
 const FASTFALL_THRESHOLD: f32 = 0.5;
+// How fast you need to move the stick to fastfall
+const STICK_MOVEMENT_NEEDED_TO_FASTFALL: f32 = 0.1;
 
 pub struct PlayerPlugin;
 
@@ -77,6 +79,8 @@ fn setup_player(mut commands: Commands, asset_server: Res<AssetServer>) {
 fn player_movement(
     fastfall_query: Query<&ActionState<PlayerActions>, With<Player>>,
     mut player_query: Query<&mut Character, With<Player>>,
+    mut last_stick_position: Local<f32>,
+    time: Res<Time>,
 ) {
     let action_state = fastfall_query.single();
     let axis_pair = action_state.clamped_axis_pair(PlayerActions::Move).unwrap();
@@ -89,6 +93,8 @@ fn player_movement(
         // Fast Fall
         if !character.movement.is_fastfalling
             && axis_pair.y() < -FASTFALL_THRESHOLD
+            && axis_pair.y() - *last_stick_position
+                < -STICK_MOVEMENT_NEEDED_TO_FASTFALL * time.delta_seconds()
             && character.is_on_air()
         {
             character.movement.wants_to_fastfall = true;
@@ -101,6 +107,8 @@ fn player_movement(
     if action_state.just_pressed(PlayerActions::Jump) {
         character.movement.wants_to_jump = true;
     }
+
+    *last_stick_position = axis_pair.y();
 }
 
 // println!("Move:");

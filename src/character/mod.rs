@@ -18,6 +18,7 @@ impl Plugin for CharacterPlugin {
 
 #[derive(Component, Debug, Clone)]
 pub struct Character {
+    /// Controls the movement of the character
     movement: CharacterMovement,
 }
 
@@ -176,7 +177,6 @@ fn character_touching_stage_check(
         }
         .unwrap();
 
-        // Yandere dev time! Why use anything else, when you can use ELSE IF
         character.movement.stage_touch_force = contact_force_event.total_force;
     }
 }
@@ -200,17 +200,14 @@ fn character_movement(
         }
 
         // FastFall
-        let mut should_fastfall = false;
-        if !character.movement.was_fastfalling_last_frame
+
+        let just_started_fastfalling = !character.movement.was_fastfalling_last_frame
             && character.movement.wants_to_fastfall
             && character.movement.fastfall_air_timer.elapsed_secs()
-                >= character.movement.air_time_needed_to_fastfall
-        {
-            should_fastfall = true;
-        }
+                >= character.movement.air_time_needed_to_fastfall;
 
         // Apply fastfall
-        if should_fastfall {
+        if just_started_fastfalling {
             if vel.linvel.y < 0. {
                 vel.linvel.y -= character.movement.fastfall_initial_speed;
             } else {
@@ -243,6 +240,14 @@ fn character_movement(
             character.movement.wants_to_jump = false;
             character.movement.is_fastfalling = false;
             character.movement.fastfall_air_timer.reset();
+
+            // In smash, when you jump, for some reason
+            // you temporarily get a speed boost or
+            // something. It seems like the game
+            // thinks you are on floor, therefore
+            // I am gonna use the same movement as
+            // the one I use when the character is on floor
+            vel.linvel.x = character.movement.x * character.movement.speed_floor;
         }
     }
 }
