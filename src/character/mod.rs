@@ -70,13 +70,11 @@ impl Character {
         self.movement.stage_touch_force.y > 0.
     }
 
-    /// Returns false if the player is not touching ANYTHING
-    ///
-    /// This function also takes into account if, for instance,
-    /// the player is bumping its head against the stage, therefore
-    /// !is_on_floor is recommended
+    /// The difference between the function and
+    /// `!is_on_floor()` is that this one will return
+    /// `false` if the character is on a wall
     pub fn is_on_air(&self) -> bool {
-        self.movement.stage_touch_force == Vec2::ZERO
+        self.movement.stage_touch_force.x == 0. && self.movement.stage_touch_force.y >= 0.
     }
 
     pub fn is_on_wall(&self) -> bool {
@@ -123,7 +121,7 @@ impl Default for Character {
                 normal_gravity: 20.,
                 fastfalling_gravity: 100.,
                 jump_boost: 1000.,
-                air_time_needed_to_fastfall: 0.35,
+                air_time_needed_to_fastfall: 0.5,
                 max_air_jumps: 1,
                 x: default(),
                 wants_to_jump: default(),
@@ -204,7 +202,8 @@ fn character_movement(
         let just_started_fastfalling = !character.movement.was_fastfalling_last_frame
             && character.movement.wants_to_fastfall
             && character.movement.fastfall_air_timer.elapsed_secs()
-                >= character.movement.air_time_needed_to_fastfall;
+                >= character.movement.air_time_needed_to_fastfall
+            && character.is_on_air();
 
         // Apply fastfall
         if just_started_fastfalling {

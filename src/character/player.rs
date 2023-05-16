@@ -93,9 +93,9 @@ fn player_movement(
         // Fast Fall
         if !character.movement.is_fastfalling
             && axis_pair.y() < -FASTFALL_THRESHOLD
+            // Honestly I have no clue
             && axis_pair.y() - *last_stick_position
                 < -STICK_MOVEMENT_NEEDED_TO_FASTFALL * time.delta_seconds()
-            && character.is_on_air()
         {
             character.movement.wants_to_fastfall = true;
         }
