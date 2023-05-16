@@ -16,17 +16,14 @@ impl Plugin for CharacterPlugin {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
-pub enum Wall {
-    Left,
-    Right,
-    Floor,
-    Below,
-}
-
 #[derive(Component, Debug, Clone)]
 pub struct Character {
-    // Variables
+    movement: CharacterMovement,
+}
+
+#[derive(Component, Debug, Clone, Default)]
+struct CharacterMovement {
+    // Constants
     pub air_time_needed_to_fastfall: f32,
     pub speed_air: f32,
     pub speed_floor: f32,
@@ -37,14 +34,16 @@ pub struct Character {
     pub jump_boost: f32,
     pub max_air_jumps: usize,
 
-    // Helpers
     /// The movement in the x axys the character should do
-    movement_x: f32,
+    x: f32,
 
     /// Whether the character wants to jump
     /// This variable is not the same as is_jumping
     /// That one should be `!self.is_on_floor()`
     wants_to_jump: bool,
+
+    /// Whether the character wants to fastfall
+    wants_to_fastfall: bool,
 
     /// Whether the character is fastfalling
     is_fastfalling: bool,
@@ -54,27 +53,20 @@ pub struct Character {
     /// It is used to prevent the character from fastfalling right after jumping
     fastfall_air_timer: Stopwatch,
 
-    /// Whether the character is touching the stage
-    is_touching_stage: Option<Wall>,
+    /// The force the character is exerting in the stage
+    /// it is equal to (0., 0.) if the character is not touching it
+    stage_touch_force: Vec2,
 
     /// How many air jumps the player has currently
     current_air_jumps: usize,
 
     /// A helper to fastfall
     was_fastfalling_last_frame: bool,
-
-    /// A helper to fastfall
-    wants_to_fastfall: bool,
-    // final y position  - beginning y position
-    // y_position_delta: f32,
 }
 
 impl Character {
     pub fn is_on_floor(&self) -> bool {
-        match &self.is_touching_stage {
-            Some(wall) => matches!(wall, Wall::Floor),
-            None => false,
-        }
+        self.movement.stage_touch_force.y > 0.
     }
 
     /// Returns false if the player is not touching ANYTHING
@@ -83,7 +75,11 @@ impl Character {
     /// the player is bumping its head against the stage, therefore
     /// !is_on_floor is recommended
     pub fn is_on_air(&self) -> bool {
-        self.is_touching_stage.is_none()
+        self.movement.stage_touch_force == Vec2::ZERO
+    }
+
+    pub fn is_on_wall(&self) -> bool {
+        self.movement.stage_touch_force.x != 0.
     }
 
     pub fn new(
@@ -98,15 +94,18 @@ impl Character {
         max_air_jumps: usize,
     ) -> Self {
         Self {
-            air_time_needed_to_fastfall,
-            speed_air,
-            speed_floor,
-            max_speed_air,
-            fastfall_initial_speed,
-            normal_gravity,
-            fastfalling_gravity,
-            jump_boost,
-            max_air_jumps,
+            movement: CharacterMovement {
+                air_time_needed_to_fastfall,
+                speed_air,
+                speed_floor,
+                max_speed_air,
+                fastfall_initial_speed,
+                normal_gravity,
+                fastfalling_gravity,
+                jump_boost,
+                max_air_jumps,
+                ..default()
+            },
             ..default()
         }
     }
@@ -115,23 +114,25 @@ impl Character {
 impl Default for Character {
     fn default() -> Self {
         return Self {
-            speed_air: 20.,
-            speed_floor: 500.,
-            max_speed_air: 500.,
-            fastfall_initial_speed: 750.,
-            normal_gravity: 20.,
-            fastfalling_gravity: 100.,
-            jump_boost: 1000.,
-            air_time_needed_to_fastfall: 0.35,
-            max_air_jumps: 1,
-            movement_x: Default::default(),
-            wants_to_jump: Default::default(),
-            is_fastfalling: Default::default(),
-            is_touching_stage: Default::default(),
-            fastfall_air_timer: Default::default(),
-            current_air_jumps: Default::default(),
-            was_fastfalling_last_frame: default(),
-            wants_to_fastfall: default(),
+            movement: CharacterMovement {
+                speed_air: 20.,
+                speed_floor: 500.,
+                max_speed_air: 500.,
+                fastfall_initial_speed: 750.,
+                normal_gravity: 20.,
+                fastfalling_gravity: 100.,
+                jump_boost: 1000.,
+                air_time_needed_to_fastfall: 0.35,
+                max_air_jumps: 1,
+                x: default(),
+                wants_to_jump: default(),
+                is_fastfalling: default(),
+                fastfall_air_timer: default(),
+                current_air_jumps: default(),
+                was_fastfalling_last_frame: default(),
+                wants_to_fastfall: default(),
+                stage_touch_force: default(),
+            },
         };
     }
 }
@@ -142,7 +143,7 @@ fn character_touching_stage_check(
     mut character_query: Query<&mut Character>,
 ) {
     character_query.for_each_mut(|mut character| {
-        character.is_touching_stage = None; // Reset the value
+        character.movement.stage_touch_force *= 0.; // Reset the variable
     });
 
     'contact_loop: for contact_force_event in contact_force_events.iter() {
@@ -176,21 +177,7 @@ fn character_touching_stage_check(
         .unwrap();
 
         // Yandere dev time! Why use anything else, when you can use ELSE IF
-        character.is_touching_stage = Some(if contact_force_event.total_force.y < 0. {
-            Wall::Below
-        } else if contact_force_event.total_force.y > 0. {
-            Wall::Floor
-        } else if contact_force_event.total_force.x > 0. {
-            Wall::Right
-        } else if contact_force_event.total_force.x < 0. {
-            Wall::Left
-        } else {
-            panic!("Wall is unknown!");
-        });
-
-        if let Wall::Floor = character.is_touching_stage.unwrap() {
-            character.is_fastfalling = false;
-        }
+        character.movement.stage_touch_force = contact_force_event.total_force;
     }
 }
 
@@ -202,18 +189,22 @@ fn character_movement(
     for (mut character, mut vel, mut gravity) in character_query.iter_mut() {
         // Horizontal Movement
         if character.is_on_floor() {
-            vel.linvel.x = character.movement_x * character.speed_floor;
+            vel.linvel.x = character.movement.x * character.movement.speed_floor;
         } else {
             // Using the same thing as in 2 lines above makes the movement feel very awkward
-            vel.linvel.x = (vel.linvel.x + character.movement_x * character.speed_air)
-                .clamp(-character.max_speed_air, character.max_speed_air);
+            vel.linvel.x = (vel.linvel.x + character.movement.x * character.movement.speed_air)
+                .clamp(
+                    -character.movement.max_speed_air,
+                    character.movement.max_speed_air,
+                );
         }
 
         // FastFall
         let mut should_fastfall = false;
-        if !character.was_fastfalling_last_frame
-            && character.wants_to_fastfall
-            && character.fastfall_air_timer.elapsed_secs() >= character.air_time_needed_to_fastfall
+        if !character.movement.was_fastfalling_last_frame
+            && character.movement.wants_to_fastfall
+            && character.movement.fastfall_air_timer.elapsed_secs()
+                >= character.movement.air_time_needed_to_fastfall
         {
             should_fastfall = true;
         }
@@ -221,37 +212,37 @@ fn character_movement(
         // Apply fastfall
         if should_fastfall {
             if vel.linvel.y < 0. {
-                vel.linvel.y -= character.fastfall_initial_speed;
+                vel.linvel.y -= character.movement.fastfall_initial_speed;
             } else {
-                vel.linvel.y = -character.fastfall_initial_speed;
+                vel.linvel.y = -character.movement.fastfall_initial_speed;
             }
-            gravity.0 = character.fastfalling_gravity;
-            character.is_fastfalling = true;
+            gravity.0 = character.movement.fastfalling_gravity;
+            character.movement.is_fastfalling = true;
         }
 
         // Remove fasfall
         let just_stopped_fasfalling =
-            character.was_fastfalling_last_frame && !character.is_fastfalling;
+            character.movement.was_fastfalling_last_frame && !character.movement.is_fastfalling;
 
         if just_stopped_fasfalling {
-            gravity.0 = character.normal_gravity;
-            character.fastfall_air_timer.reset();
-            character.is_fastfalling = false;
+            gravity.0 = character.movement.normal_gravity;
+            character.movement.fastfall_air_timer.reset();
+            character.movement.is_fastfalling = false;
         }
 
         // Reset the variable
-        character.wants_to_fastfall = false;
-        character.was_fastfalling_last_frame = character.is_fastfalling;
+        character.movement.wants_to_fastfall = false;
+        character.movement.was_fastfalling_last_frame = character.movement.is_fastfalling;
 
         // Jump
-        if character.wants_to_jump && character.current_air_jumps > 0 {
+        if character.movement.wants_to_jump && character.movement.current_air_jumps > 0 {
             if !character.is_on_floor() {
-                character.current_air_jumps -= 1;
+                character.movement.current_air_jumps -= 1;
             }
-            vel.linvel.y = character.jump_boost;
-            character.wants_to_jump = false;
-            character.is_fastfalling = false;
-            character.fastfall_air_timer.reset();
+            vel.linvel.y = character.movement.jump_boost;
+            character.movement.wants_to_jump = false;
+            character.movement.is_fastfalling = false;
+            character.movement.fastfall_air_timer.reset();
         }
     }
 }
@@ -259,11 +250,11 @@ fn character_movement(
 fn character_information_update(mut character_query: Query<&mut Character>, time: Res<Time>) {
     for mut character in character_query.iter_mut() {
         if !character.is_on_floor() {
-            character.fastfall_air_timer.tick(time.delta());
+            character.movement.fastfall_air_timer.tick(time.delta());
         }
 
         if character.is_on_floor() {
-            character.current_air_jumps = character.max_air_jumps;
+            character.movement.current_air_jumps = character.movement.max_air_jumps;
         }
     }
 }

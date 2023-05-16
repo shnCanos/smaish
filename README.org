@@ -4,3 +4,4 @@ A terrible attempt at cloning smash
 
 * DONE Debug fastfall timer
 * TODO Use movement to control fastfall rather than pure stats
+* TODO Add jump momentum

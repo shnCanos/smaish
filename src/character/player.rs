@@ -55,7 +55,7 @@ fn setup_player(mut commands: Commands, asset_server: Res<AssetServer>) {
         },
         LockedAxes::ROTATION_LOCKED,
         character.clone(),
-        GravityScale(character.normal_gravity),
+        GravityScale(character.movement.normal_gravity),
     ));
 
     commands
@@ -84,20 +84,22 @@ fn player_movement(
 
     if action_state.pressed(PlayerActions::Move) {
         // Sides
-        character.movement_x = axis_pair.x().clamp(-1., 1.);
+        character.movement.x = axis_pair.x().clamp(-1., 1.);
 
         // Fast Fall
-        if !character.is_fastfalling && axis_pair.y() < -FASTFALL_THRESHOLD && character.is_on_air()
+        if !character.movement.is_fastfalling
+            && axis_pair.y() < -FASTFALL_THRESHOLD
+            && character.is_on_air()
         {
-            character.wants_to_fastfall = true;
+            character.movement.wants_to_fastfall = true;
         }
     } else {
-        character.movement_x = 0.;
+        character.movement.x = 0.;
     }
 
     // Jump
     if action_state.just_pressed(PlayerActions::Jump) {
-        character.wants_to_jump = true;
+        character.movement.wants_to_jump = true;
     }
 }
 
