@@ -253,7 +253,7 @@ fn character_movement(
 
 fn character_information_update(mut character_query: Query<&mut Character>, time: Res<Time>) {
     for mut character in character_query.iter_mut() {
-        if !character.is_on_floor() {
+        if character.is_on_air() {
             character.movement.fastfall_air_timer.tick(time.delta());
         }
 
