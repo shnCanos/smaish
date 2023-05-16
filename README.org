@@ -1,5 +1,6 @@
 #+title: Smaish
 
+* SMAISH
 A terrible attempt at cloning smash
 
 * TODO-LIST
