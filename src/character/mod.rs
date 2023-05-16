@@ -66,18 +66,18 @@ struct CharacterMovement {
 }
 
 impl Character {
-    pub fn is_on_floor(&self) -> bool {
+    fn is_on_floor(&self) -> bool {
         self.movement.stage_touch_force.y > 0.
     }
 
     /// The difference between the function and
     /// `!is_on_floor()` is that this one will return
     /// `false` if the character is on a wall
-    pub fn is_on_air(&self) -> bool {
+    fn is_on_air(&self) -> bool {
         self.movement.stage_touch_force.x == 0. && self.movement.stage_touch_force.y >= 0.
     }
 
-    pub fn is_on_wall(&self) -> bool {
+    fn is_on_wall(&self) -> bool {
         self.movement.stage_touch_force.x != 0.
     }
 
@@ -203,7 +203,7 @@ fn character_movement(
             && character.movement.wants_to_fastfall
             && character.movement.fastfall_air_timer.elapsed_secs()
                 >= character.movement.air_time_needed_to_fastfall
-            && character.is_on_air();
+            && !character.is_on_floor();
 
         // Apply fastfall
         if just_started_fastfalling {
@@ -253,7 +253,7 @@ fn character_movement(
 
 fn character_information_update(mut character_query: Query<&mut Character>, time: Res<Time>) {
     for mut character in character_query.iter_mut() {
-        if character.is_on_air() {
+        if !character.is_on_floor() {
             character.movement.fastfall_air_timer.tick(time.delta());
         }
 
