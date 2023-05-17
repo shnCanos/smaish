@@ -36,6 +36,7 @@ struct CharacterMovement {
     pub max_air_jumps: usize,
 
     /// The movement in the x axys the character should do
+    /// Must be between -1 and 1
     x: f32,
 
     /// Whether the character wants to jump
@@ -74,7 +75,7 @@ impl Character {
     /// `!is_on_floor()` is that this one will return
     /// `false` if the character is on a wall
     fn is_on_air(&self) -> bool {
-        self.movement.stage_touch_force.x == 0. && self.movement.stage_touch_force.y >= 0.
+        self.movement.stage_touch_force.x == 0. && self.movement.stage_touch_force.y <= 0.
     }
 
     fn is_on_wall(&self) -> bool {
@@ -248,6 +249,9 @@ fn character_movement(
             // the one I use when the character is on floor
             vel.linvel.x = character.movement.x * character.movement.speed_floor;
         }
+
+        // reset the variable
+        character.movement.wants_to_jump = false;
     }
 }
 

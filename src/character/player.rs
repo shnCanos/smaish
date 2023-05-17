@@ -1,3 +1,5 @@
+use std::dbg;
+
 use bevy::prelude::*;
 use bevy_rapier2d::prelude::*;
 use leafwing_input_manager::prelude::*;
@@ -29,7 +31,11 @@ struct Player;
 
 #[derive(Actionlike, PartialEq, Eq, Clone, Copy, Hash, Debug)]
 enum PlayerActions {
-    Move,
+    /// For the keyboard
+    MoveRight,
+    MoveLeft,
+    /// For the controller
+    MoveStick,
     Jump,
     NormalAttack,
     SpecialAttack,
@@ -66,9 +72,12 @@ fn setup_player(mut commands: Commands, asset_server: Res<AssetServer>) {
             action_state: ActionState::default(),
             input_map: InputMap::new([
                 (KeyCode::Space, PlayerActions::Jump),
+                (KeyCode::W, PlayerActions::Jump),
                 (KeyCode::S, PlayerActions::FastFall),
+                (KeyCode::A, PlayerActions::MoveLeft),
+                (KeyCode::D, PlayerActions::MoveRight),
             ])
-            .insert(DualAxis::left_stick(), PlayerActions::Move)
+            .insert(DualAxis::left_stick(), PlayerActions::MoveStick)
             .insert(GamepadButtonType::West, PlayerActions::Jump)
             .insert(GamepadButtonType::North, PlayerActions::Jump)
             .build(),
@@ -77,16 +86,20 @@ fn setup_player(mut commands: Commands, asset_server: Res<AssetServer>) {
 }
 
 fn player_movement(
-    fastfall_query: Query<&ActionState<PlayerActions>, With<Player>>,
+    action_state_query: Query<&ActionState<PlayerActions>, With<Player>>,
     mut player_query: Query<&mut Character, With<Player>>,
     mut last_stick_position: Local<f32>,
+    mut last_stick_position_but_keyboard: Local<bool>,
     time: Res<Time>,
 ) {
-    let action_state = fastfall_query.single();
-    let axis_pair = action_state.clamped_axis_pair(PlayerActions::Move).unwrap();
+    // Controller Movement
+    let action_state = action_state_query.single();
+    let axis_pair = action_state
+        .clamped_axis_pair(PlayerActions::MoveStick)
+        .unwrap();
     let mut character = player_query.single_mut();
 
-    if action_state.pressed(PlayerActions::Move) {
+    if action_state.pressed(PlayerActions::MoveStick) {
         // Sides
         character.movement.x = axis_pair.x().clamp(-1., 1.);
 
@@ -102,13 +115,26 @@ fn player_movement(
     } else {
         character.movement.x = 0.;
     }
+    *last_stick_position = axis_pair.y();
+
+    // Keyboard Movement
+    let mut movement = 0.;
+    if action_state.pressed(PlayerActions::MoveLeft) {
+        movement += -1.;
+    }
+    if action_state.pressed(PlayerActions::MoveRight) {
+        movement += 1.;
+    }
+    if action_state.pressed(PlayerActions::FastFall) && !*last_stick_position_but_keyboard {
+        character.movement.wants_to_fastfall = true;
+    }
+    character.movement.x = movement;
+    *last_stick_position_but_keyboard = action_state.pressed(PlayerActions::FastFall);
 
     // Jump
     if action_state.just_pressed(PlayerActions::Jump) {
         character.movement.wants_to_jump = true;
     }
-
-    *last_stick_position = axis_pair.y();
 }
 
 // println!("Move:");
