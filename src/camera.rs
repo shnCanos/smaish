@@ -18,7 +18,7 @@ struct MainGameCamera;
 pub struct CameraFollows {
     /// The camera will make sure the center of the body is visible + padding pixels.
     /// Since the window isn't a square (I hope),
-    /// it only adds `padding` pixels to the biggest side and adds whatever
+    /// it only adds `padding` pixels to the smallest side and adds whatever
     /// necessary to maintain ration in the other
     pub padding: usize,
 }
@@ -66,14 +66,14 @@ fn camera_follows(
         })
         .unwrap();
 
-    let window_height = window.height();
-    let window_width = window.width();
-
     camera_tf.translation = camera_tf
         .translation
         .lerp(character_translation_average, CAMERA_LERP_SPEED);
 
+    let window_height = window.height();
+    let window_width = window.width();
+
     camera_projection.scale = (max_distance_from_camera.0.abs().x * 2. / window_width)
         .max(max_distance_from_camera.0.abs().y * 2. / window_height)
-        + max_distance_from_camera.1 / window_height.max(window_width);
+        + max_distance_from_camera.1 / window_height.min(window_width);
 }
