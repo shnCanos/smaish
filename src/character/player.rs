@@ -4,7 +4,7 @@ use leafwing_input_manager::prelude::*;
 
 use crate::camera::CameraFollows;
 
-use super::Character;
+use super::{Character, CharacterBundle, CharacterMovement};
 
 // Most of these constants will change according to the character.
 // They're placeholders
@@ -44,7 +44,7 @@ enum PlayerActions {
 }
 
 fn setup_player(mut commands: Commands, asset_server: Res<AssetServer>) {
-    let character = Character::default();
+    let character = CharacterBundle::default();
     commands.spawn((
         SpriteBundle {
             sprite: Sprite {
@@ -104,14 +104,14 @@ fn setup_dummy(mut commands: Commands, asset_server: Res<AssetServer>) {
             ..default()
         },
         LockedAxes::ROTATION_LOCKED,
-        Character::default(),
+        CharacterBundle::default(),
         CameraFollows { padding: 250 },
     ));
 }
 
 fn player_movement(
     action_state_query: Query<&ActionState<PlayerActions>, With<Player>>,
-    mut player_query: Query<&mut Character, With<Player>>,
+    mut player_query: Query<&mut CharacterMovement, With<Player>>,
     mut last_stick_position: Local<f32>,
     time: Res<Time>,
 ) {
@@ -120,45 +120,45 @@ fn player_movement(
     let axis_pair = action_state
         .clamped_axis_pair(PlayerActions::MoveStick)
         .unwrap();
-    let mut character = player_query.single_mut();
+    let mut movement = player_query.single_mut();
 
     if action_state.pressed(PlayerActions::MoveStick) {
         // Sides
-        character.movement.x = axis_pair.x().clamp(-1., 1.);
+        movement.x = axis_pair.x().clamp(-1., 1.);
 
         // Fast Fall
-        if !character.movement.is_fastfalling
+        if !movement.is_fastfalling
             && axis_pair.y() < -FASTFALL_THRESHOLD
             // Honestly I have no clue
             && axis_pair.y() - *last_stick_position
                 < -STICK_MOVEMENT_NEEDED_TO_FASTFALL * time.delta_seconds()
         {
-            character.movement.wants_to_fastfall = true;
+            movement.wants_to_fastfall = true;
         }
     } else {
-        character.movement.x = 0.;
+        movement.x = 0.;
     }
     *last_stick_position = axis_pair.y();
 
     // Keyboard Movement
-    let mut movement = 0.;
+    let mut direction = 0.;
     if action_state.pressed(PlayerActions::MoveLeft) {
-        movement += -1.;
+        direction += -1.;
     }
     if action_state.pressed(PlayerActions::MoveRight) {
-        movement += 1.;
+        direction += 1.;
     }
-    if movement != 0. {
-        character.movement.x = movement;
+    if direction != 0. {
+        movement.x = direction;
         *last_stick_position = action_state.pressed(PlayerActions::FastFall).into();
     }
     if action_state.pressed(PlayerActions::FastFall) && *last_stick_position >= 0. {
-        character.movement.wants_to_fastfall = true;
+        movement.wants_to_fastfall = true;
     }
 
     // Jump
     if action_state.just_pressed(PlayerActions::Jump) {
-        character.movement.wants_to_jump = true;
+        movement.wants_to_jump = true;
     }
 }
 
