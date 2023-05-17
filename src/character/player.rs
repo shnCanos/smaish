@@ -1,8 +1,8 @@
-use std::dbg;
-
 use bevy::prelude::*;
 use bevy_rapier2d::prelude::*;
 use leafwing_input_manager::prelude::*;
+
+use crate::camera::CameraFollows;
 
 use super::Character;
 
@@ -21,6 +21,7 @@ pub struct PlayerPlugin;
 impl Plugin for PlayerPlugin {
     fn build(&self, app: &mut App) {
         app.add_startup_system(setup_player)
+            .add_startup_system(setup_dummy)
             .add_plugin(InputManagerPlugin::<PlayerActions>::default())
             .add_system(player_movement);
     }
@@ -64,6 +65,7 @@ fn setup_player(mut commands: Commands, asset_server: Res<AssetServer>) {
         LockedAxes::ROTATION_LOCKED,
         character.clone(),
         GravityScale(character.movement.normal_gravity),
+        CameraFollows { padding: 250 },
     ));
 
     commands
@@ -85,11 +87,32 @@ fn setup_player(mut commands: Commands, asset_server: Res<AssetServer>) {
         .insert(Player);
 }
 
+fn setup_dummy(mut commands: Commands, asset_server: Res<AssetServer>) {
+    commands.spawn((
+        SpriteBundle {
+            sprite: Sprite {
+                custom_size: Some(Vec2::new(50., 50.)),
+                ..default()
+            },
+            texture: asset_server.load("bandanadee.png"),
+            ..default()
+        },
+        RigidBody::Dynamic,
+        Collider::cuboid(25., 25.),
+        Velocity {
+            linvel: Vec2::ZERO,
+            ..default()
+        },
+        LockedAxes::ROTATION_LOCKED,
+        Character::default(),
+        CameraFollows { padding: 250 },
+    ));
+}
+
 fn player_movement(
     action_state_query: Query<&ActionState<PlayerActions>, With<Player>>,
     mut player_query: Query<&mut Character, With<Player>>,
     mut last_stick_position: Local<f32>,
-    mut last_stick_position_but_keyboard: Local<bool>,
     time: Res<Time>,
 ) {
     // Controller Movement
@@ -125,11 +148,13 @@ fn player_movement(
     if action_state.pressed(PlayerActions::MoveRight) {
         movement += 1.;
     }
-    if action_state.pressed(PlayerActions::FastFall) && !*last_stick_position_but_keyboard {
+    if movement != 0. {
+        character.movement.x = movement;
+        *last_stick_position = action_state.pressed(PlayerActions::FastFall).into();
+    }
+    if action_state.pressed(PlayerActions::FastFall) && *last_stick_position >= 0. {
         character.movement.wants_to_fastfall = true;
     }
-    character.movement.x = movement;
-    *last_stick_position_but_keyboard = action_state.pressed(PlayerActions::FastFall);
 
     // Jump
     if action_state.just_pressed(PlayerActions::Jump) {

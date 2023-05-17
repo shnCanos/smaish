@@ -3,7 +3,7 @@ mod character;
 mod stage;
 
 use bevy::prelude::*;
-use bevy_embedded_assets::EmbeddedAssetPlugin;
+// use bevy_embedded_assets::EmbeddedAssetPlugin;
 use bevy_rapier2d::prelude::*;
 
 fn setup_window(mut window: Query<&mut Window>) {
@@ -17,9 +17,8 @@ fn main() {
     App::new()
         .add_startup_system(setup_window)
         .add_plugins(
-            DefaultPlugins
-                .build()
-                .add_before::<bevy::asset::AssetPlugin, _>(EmbeddedAssetPlugin),
+            DefaultPlugins, // .build()
+                            // .add_before::<bevy::asset::AssetPlugin, _>(EmbeddedAssetPlugin),
         )
         .add_plugin(RapierPhysicsPlugin::<NoUserData>::default())
         .add_plugin(RapierDebugRenderPlugin::default())
