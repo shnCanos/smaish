@@ -75,7 +75,7 @@ impl CharacterMovement {
     /// `!is_on_floor()` is that this one will return
     /// `false` if the character is on a wall
     fn is_on_air(&self) -> bool {
-        self.stage_touch_force.x == 0. && self.stage_touch_force.y <= 0.
+        !self.is_on_floor() && !self.is_on_wall()
     }
 
     fn is_on_wall(&self) -> bool {
@@ -157,7 +157,6 @@ fn character_touching_stage_check(
 }
 
 /// Applies the movement to the character.
-/// TODO Walljump
 fn character_movement(
     mut character_query: Query<(&mut CharacterMovement, &mut Velocity, &mut GravityScale)>,
 ) {
@@ -201,13 +200,12 @@ fn character_movement(
             movement.is_fastfalling = false;
         }
 
-        // Reset the variable
-        movement.wants_to_fastfall = false;
-        movement.was_fastfalling_last_frame = movement.is_fastfalling;
-
         // Jump
-        if movement.wants_to_jump && movement.current_air_jumps > 0 {
-            if !movement.is_on_floor() {
+        let gonna_inevitably_walljump =
+            movement.stage_touch_force.x * movement.x > 0. && movement.is_on_wall();
+
+        if movement.wants_to_jump && movement.current_air_jumps > 0 || gonna_inevitably_walljump {
+            if movement.is_on_air() {
                 movement.current_air_jumps -= 1;
             }
             vel.linvel.y = movement.jump_boost;
@@ -222,8 +220,10 @@ fn character_movement(
             vel.linvel.x = movement.x * movement.speed_floor;
         }
 
-        // reset the variable
+        // reset the variables
         movement.wants_to_jump = false;
+        movement.wants_to_fastfall = false;
+        movement.was_fastfalling_last_frame = movement.is_fastfalling;
     }
 }
 
