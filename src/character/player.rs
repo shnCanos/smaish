@@ -4,7 +4,7 @@ use leafwing_input_manager::prelude::*;
 
 use crate::camera::CameraFollows;
 
-use super::{Character, CharacterBundle, CharacterMovement};
+use super::{CharacterBundle, CharacterMovement};
 
 // Most of these constants will change according to the character.
 // They're placeholders
@@ -133,7 +133,7 @@ fn player_movement(
             && axis_pair.y() - *last_stick_position
                 < -STICK_MOVEMENT_NEEDED_TO_FASTFALL * time.delta_seconds()
         {
-            movement.wants_to_fastfall = true;
+            movement.fastfall();
         }
     } else {
         movement.x = 0.;
@@ -153,12 +153,12 @@ fn player_movement(
         *last_stick_position = action_state.pressed(PlayerActions::FastFall).into();
     }
     if action_state.pressed(PlayerActions::FastFall) && *last_stick_position >= 0. {
-        movement.wants_to_fastfall = true;
+        movement.fastfall();
     }
 
     // Jump
     if action_state.just_pressed(PlayerActions::Jump) {
-        movement.wants_to_jump = true;
+        movement.jump()
     }
 }
 

@@ -1,6 +1,6 @@
 mod player;
 
-use bevy::{prelude::*, time::Stopwatch};
+use bevy::prelude::*;
 use bevy_rapier2d::prelude::*;
 
 use crate::stage::Stage;
@@ -31,7 +31,6 @@ pub struct Character {
 #[derive(Component, Debug, Clone)]
 pub struct CharacterMovement {
     // Constants
-    pub air_time_needed_to_fastfall: f32,
     pub speed_air: f32,
     pub speed_floor: f32,
     pub max_speed_air: f32,
@@ -55,11 +54,6 @@ pub struct CharacterMovement {
 
     /// Whether the character is fastfalling
     is_fastfalling: bool,
-
-    /// This stopwatch counts the time from when the character
-    /// last jumped (doesn't count if the character is on the floor).
-    /// It is used to prevent the character from fastfalling right after jumping
-    fastfall_air_timer: Stopwatch,
 
     /// The force the character is exerting in the stage
     /// it is equal to (0., 0.) if the character is not touching it
@@ -88,29 +82,12 @@ impl CharacterMovement {
         self.stage_touch_force.x != 0.
     }
 
-    pub fn new(
-        air_time_needed_to_fastfall: f32,
-        speed_air: f32,
-        speed_floor: f32,
-        max_speed_air: f32,
-        fastfall_initial_speed: f32,
-        normal_gravity: f32,
-        fastfalling_gravity: f32,
-        jump_boost: f32,
-        max_air_jumps: usize,
-    ) -> Self {
-        Self {
-            air_time_needed_to_fastfall,
-            speed_air,
-            speed_floor,
-            max_speed_air,
-            fastfall_initial_speed,
-            normal_gravity,
-            fastfalling_gravity,
-            jump_boost,
-            max_air_jumps,
-            ..default()
-        }
+    fn fastfall(&mut self) {
+        self.wants_to_fastfall = true;
+    }
+
+    fn jump(&mut self) {
+        self.wants_to_jump = true;
     }
 }
 
@@ -124,12 +101,10 @@ impl Default for CharacterMovement {
             normal_gravity: 20.,
             fastfalling_gravity: 100.,
             jump_boost: 1000.,
-            air_time_needed_to_fastfall: 0.5,
             max_air_jumps: 1,
             x: default(),
             wants_to_jump: default(),
             is_fastfalling: default(),
-            fastfall_air_timer: default(),
             current_air_jumps: default(),
             was_fastfalling_last_frame: default(),
             wants_to_fastfall: default(),
@@ -182,7 +157,7 @@ fn character_touching_stage_check(
 }
 
 /// Applies the movement to the character.
-/// ~~TODO: Change this terrible system, what the hell was I thinking when I wrote this~~
+/// TODO Walljump
 fn character_movement(
     mut character_query: Query<(&mut CharacterMovement, &mut Velocity, &mut GravityScale)>,
 ) {
@@ -197,10 +172,9 @@ fn character_movement(
         }
 
         // FastFall
-
         let just_started_fastfalling = !movement.was_fastfalling_last_frame
             && movement.wants_to_fastfall
-            && movement.fastfall_air_timer.elapsed_secs() >= movement.air_time_needed_to_fastfall
+            && vel.linvel.y < 0.
             && !movement.is_on_floor();
 
         // Apply fastfall
@@ -215,12 +189,15 @@ fn character_movement(
         }
 
         // Remove fasfall
+        if movement.is_on_floor() {
+            movement.is_fastfalling = false;
+        }
+
         let just_stopped_fasfalling =
             movement.was_fastfalling_last_frame && !movement.is_fastfalling;
 
         if just_stopped_fasfalling {
             gravity.0 = movement.normal_gravity;
-            movement.fastfall_air_timer.reset();
             movement.is_fastfalling = false;
         }
 
@@ -234,9 +211,7 @@ fn character_movement(
                 movement.current_air_jumps -= 1;
             }
             vel.linvel.y = movement.jump_boost;
-            movement.wants_to_jump = false;
             movement.is_fastfalling = false;
-            movement.fastfall_air_timer.reset();
 
             // In smash, when you jump, for some reason
             // you temporarily get a speed boost or
@@ -252,15 +227,8 @@ fn character_movement(
     }
 }
 
-fn character_information_update(
-    mut character_query: Query<&mut CharacterMovement>,
-    time: Res<Time>,
-) {
+fn character_information_update(mut character_query: Query<&mut CharacterMovement>) {
     for mut character in character_query.iter_mut() {
-        if !character.is_on_floor() {
-            character.fastfall_air_timer.tick(time.delta());
-        }
-
         if character.is_on_floor() {
             character.current_air_jumps = character.max_air_jumps;
         }

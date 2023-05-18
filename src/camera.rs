@@ -1,6 +1,7 @@
 use bevy::prelude::*;
 
-const CAMERA_LERP_SPEED: f32 = 1.;
+const ZOOMING_IN_CAMERA_LERP_SPEED: f32 = 0.01;
+const ZOOMING_OUT_CAMERA_LERP_SPEED: f32 = 0.8;
 
 pub struct CameraPlugin;
 
@@ -66,14 +67,19 @@ fn camera_follows(
         })
         .unwrap();
 
-    camera_tf.translation = camera_tf
-        .translation
-        .lerp(character_translation_average, CAMERA_LERP_SPEED);
+    camera_tf.translation = character_translation_average;
 
     let window_height = window.height();
     let window_width = window.width();
-
-    camera_projection.scale = (max_distance_from_camera.0.abs().x * 2. / window_width)
+    let new_camera_scale = (max_distance_from_camera.0.abs().x * 2. / window_width)
         .max(max_distance_from_camera.0.abs().y * 2. / window_height)
         + max_distance_from_camera.1 / window_height.min(window_width);
+
+    camera_projection.scale = camera_projection.scale
+        + (new_camera_scale - camera_projection.scale)
+            * if new_camera_scale - camera_projection.scale < 0. {
+                ZOOMING_IN_CAMERA_LERP_SPEED
+            } else {
+                ZOOMING_OUT_CAMERA_LERP_SPEED
+            };
 }
