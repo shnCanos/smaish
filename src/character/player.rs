@@ -6,12 +6,6 @@ use crate::camera::CameraFollows;
 
 use super::{CharacterBundle, CharacterMovement};
 
-// Most of these constants will change according to the character.
-// They're placeholders
-// const PLAYER_JUMP: f32 = 10.;
-// const PLAYER_FAST_FALL: f32 = 5.;
-// const PLAYER_SPEED_AIR: f32 = 5.;
-// const PLAYER_SPEED_FLOOR: f32 = 10.;
 const FASTFALL_THRESHOLD: f32 = 0.5;
 // How fast you need to move the stick to fastfall
 const STICK_MOVEMENT_NEEDED_TO_FASTFALL: f32 = 0.1;
@@ -44,7 +38,11 @@ enum PlayerActions {
 }
 
 fn setup_player(mut commands: Commands, asset_server: Res<AssetServer>) {
-    let character = CharacterBundle::default();
+    let character = CharacterBundle {
+        grav: GravityScale(20.),
+        ..default()
+    };
+
     commands.spawn((
         SpriteBundle {
             sprite: Sprite {
@@ -57,14 +55,8 @@ fn setup_player(mut commands: Commands, asset_server: Res<AssetServer>) {
         RigidBody::Dynamic,
         Player,
         Collider::cuboid(50., 50.),
-        // GravityScale(10.),
-        Velocity {
-            linvel: Vec2::ZERO,
-            ..default()
-        },
         LockedAxes::ROTATION_LOCKED,
         character.clone(),
-        GravityScale(character.movement.normal_gravity),
         CameraFollows { padding: 250 },
     ));
 
@@ -99,10 +91,6 @@ fn setup_dummy(mut commands: Commands, asset_server: Res<AssetServer>) {
         },
         RigidBody::Dynamic,
         Collider::cuboid(25., 25.),
-        Velocity {
-            linvel: Vec2::ZERO,
-            ..default()
-        },
         LockedAxes::ROTATION_LOCKED,
         CharacterBundle::default(),
         CameraFollows { padding: 250 },
@@ -161,8 +149,3 @@ fn player_movement(
         movement.jump()
     }
 }
-
-// println!("Move:");
-// println!("   distance: {}", axis_pair.length());
-// println!("          x: {}", axis_pair.x());
-// println!("          y: {}", axis_pair.y());

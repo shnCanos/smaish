@@ -20,6 +20,8 @@ impl Plugin for CharacterPlugin {
 pub struct CharacterBundle {
     name: Character,
     pub movement: CharacterMovement,
+    pub vel: Velocity,
+    pub grav: GravityScale,
 }
 
 #[derive(Component, Debug, Clone, Default)]
@@ -97,9 +99,9 @@ impl Default for CharacterMovement {
             speed_air: 20.,
             speed_floor: 500.,
             max_speed_air: 500.,
-            fastfall_initial_speed: 750.,
+            fastfall_initial_speed: 0.,
             normal_gravity: 20.,
-            fastfalling_gravity: 100.,
+            fastfalling_gravity: 175.,
             jump_boost: 1000.,
             max_air_jumps: 1,
             x: default(),
@@ -157,6 +159,7 @@ fn character_touching_stage_check(
 }
 
 /// Applies the movement to the character.
+/// TODO Add walljump limit to wall on the same side
 fn character_movement(
     mut character_query: Query<(&mut CharacterMovement, &mut Velocity, &mut GravityScale)>,
 ) {
@@ -178,11 +181,7 @@ fn character_movement(
 
         // Apply fastfall
         if just_started_fastfalling {
-            if vel.linvel.y < 0. {
-                vel.linvel.y -= movement.fastfall_initial_speed;
-            } else {
-                vel.linvel.y = -movement.fastfall_initial_speed;
-            }
+            vel.linvel.y -= movement.fastfall_initial_speed;
             gravity.0 = movement.fastfalling_gravity;
             movement.is_fastfalling = true;
         }
@@ -199,6 +198,10 @@ fn character_movement(
             gravity.0 = movement.normal_gravity;
             movement.is_fastfalling = false;
         }
+
+        // Reset the variables
+        movement.wants_to_fastfall = false;
+        movement.was_fastfalling_last_frame = movement.is_fastfalling;
 
         // Jump
         let gonna_inevitably_walljump =
@@ -220,10 +223,8 @@ fn character_movement(
             vel.linvel.x = movement.x * movement.speed_floor;
         }
 
-        // reset the variables
+        // reset the variable
         movement.wants_to_jump = false;
-        movement.wants_to_fastfall = false;
-        movement.was_fastfalling_last_frame = movement.is_fastfalling;
     }
 }
 

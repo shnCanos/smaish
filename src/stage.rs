@@ -16,7 +16,7 @@ fn setup_stage(mut commands: Commands) {
     commands.spawn((
         SpriteBundle {
             transform: Transform {
-                translation: Vec2::new(0., -100.).extend(0.),
+                translation: Vec2::new(0., -1000.).extend(0.),
                 ..default()
             },
             ..default()
@@ -24,7 +24,7 @@ fn setup_stage(mut commands: Commands) {
         RigidBody::Fixed,
         // GravityScale(0.),
         Velocity::default(),
-        Collider::cuboid(500., 50.),
+        Collider::cuboid(500., 500.),
         Stage,
         ActiveEvents::CONTACT_FORCE_EVENTS,
     ));
