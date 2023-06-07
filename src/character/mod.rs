@@ -12,22 +12,26 @@ impl Plugin for CharacterPlugin {
         app.add_plugin(player::PlayerPlugin)
             .add_system(character_touching_stage_check)
             .add_system(character_movement)
-            .add_system(character_information_update);
+            .add_system(character_attack)
+            .add_system(attack_system);
     }
 }
 
 #[derive(Bundle, Default, Clone)]
 pub struct CharacterBundle {
-    name: Character,
+    pub typ: Character,
     pub movement: CharacterMovement,
     pub vel: Velocity,
     pub grav: GravityScale,
+    pub damping: Damping,
+    pub mass: ColliderMassProperties,
+    pub kincharcont: KinematicCharacterController,
+    pub attacks: CharacterAttackController,
 }
 
 #[derive(Component, Debug, Clone, Default)]
 pub struct Character {
-    // Controls the movement of the character
-    // movement: CharacterMovement,
+    pub percentage: f32,
 }
 
 #[derive(Component, Debug, Clone)]
@@ -41,6 +45,7 @@ pub struct CharacterMovement {
     pub fastfalling_gravity: f32,
     pub jump_boost: f32,
     pub max_air_jumps: usize,
+    pub can_walljump: bool,
 
     /// The movement in the x axys the character should do
     /// Must be between -1 and 1
@@ -66,22 +71,40 @@ pub struct CharacterMovement {
 
     /// A helper to fastfall
     was_fastfalling_last_frame: bool,
+
+    /// Helper to track the last walljump direction
+    walljump_direction: f32,
+}
+
+#[derive(Component, Debug, Clone, Default)]
+pub struct CharacterAttack {
+    damage: f32,
+    has_attacked: Vec<Entity>,
+}
+
+#[derive(Component, Debug, Clone, Default)]
+pub struct CharacterAttackController {
+    attack_timer: Option<Timer>,
+    wants_to_forward_air: bool,
+    velocity_from_knockback: Vec2,
 }
 
 impl CharacterMovement {
-    fn is_on_floor(&self) -> bool {
+    fn is_on_stage(&self) -> bool {
         self.stage_touch_force.y > 0.
     }
 
     /// The difference between the function and
     /// `!is_on_floor()` is that this one will return
     /// `false` if the character is on a wall
-    fn is_on_air(&self) -> bool {
-        !self.is_on_floor() && !self.is_on_wall()
+    fn is_not_touching_stage(&self) -> bool {
+        !self.is_on_stage() && !self.is_on_stage_wall()
     }
 
-    fn is_on_wall(&self) -> bool {
+    fn is_on_stage_wall(&self) -> bool {
         self.stage_touch_force.x != 0.
+            // For slopes
+            && self.stage_touch_force.y == 0.
     }
 
     fn fastfall(&mut self) {
@@ -93,17 +116,27 @@ impl CharacterMovement {
     }
 }
 
+impl CharacterAttackController {
+    pub fn forward_air(&mut self) {
+        self.wants_to_forward_air = true;
+    }
+    fn is_attacking(&self) -> bool {
+        self.attack_timer.is_some()
+    }
+}
+
 impl Default for CharacterMovement {
     fn default() -> Self {
         return Self {
             speed_air: 20.,
             speed_floor: 500.,
-            max_speed_air: 500.,
+            max_speed_air: 650.,
             fastfall_initial_speed: 0.,
             normal_gravity: 20.,
             fastfalling_gravity: 175.,
             jump_boost: 1000.,
             max_air_jumps: 1,
+            can_walljump: true,
             x: default(),
             wants_to_jump: default(),
             is_fastfalling: default(),
@@ -111,6 +144,7 @@ impl Default for CharacterMovement {
             was_fastfalling_last_frame: default(),
             wants_to_fastfall: default(),
             stage_touch_force: default(),
+            walljump_direction: default(),
         };
     }
 }
@@ -125,10 +159,12 @@ fn character_touching_stage_check(
     });
 
     'contact_loop: for contact_force_event in contact_force_events.iter() {
-        // Not very pretty or preformant, but bug free👍🏻! (Probably)
-        // It should be better in terms of performance if I use
-        // collision events too, but that would mean I need to think
-        // and like, use my brain????? so weird. Not gonna do it lol
+        /*
+        Not very pretty or preformant, but bug free👍🏻! (Probably)
+        It should be better in terms of performance if I use
+        collision events too, but that would mean I need to think
+        and like, use my brain????? so weird. Not gonna do it lol
+        */
 
         let character_check = [
             [
@@ -159,25 +195,41 @@ fn character_touching_stage_check(
 }
 
 /// Applies the movement to the character.
-/// TODO Add walljump limit to wall on the same side
 fn character_movement(
-    mut character_query: Query<(&mut CharacterMovement, &mut Velocity, &mut GravityScale)>,
+    mut character_query: Query<(
+        &mut CharacterAttackController,
+        &mut CharacterMovement,
+        &mut Velocity,
+        &mut GravityScale,
+    )>,
 ) {
-    for (mut movement, mut vel, mut gravity) in character_query.iter_mut() {
+    for (mut attack_controller, mut movement, mut vel, mut gravity) in character_query.iter_mut() {
         // Horizontal Movement
-        if movement.is_on_floor() {
+        if movement.is_on_stage() {
             vel.linvel.x = movement.x * movement.speed_floor;
         } else {
             // Using the same thing as in 2 lines above makes the feel very awkward
             vel.linvel.x = (vel.linvel.x + movement.x * movement.speed_air)
                 .clamp(-movement.max_speed_air, movement.max_speed_air);
+
+            vel.linvel += attack_controller.velocity_from_knockback;
         }
+
+        attack_controller.velocity_from_knockback.x +=
+            -(attack_controller.velocity_from_knockback.x.abs()
+                / attack_controller.velocity_from_knockback.x)
+                * 1.;
+
+        attack_controller.velocity_from_knockback.y +=
+            -(attack_controller.velocity_from_knockback.y.abs()
+                / attack_controller.velocity_from_knockback.y)
+                * 1.;
 
         // FastFall
         let just_started_fastfalling = !movement.was_fastfalling_last_frame
             && movement.wants_to_fastfall
             && vel.linvel.y < 0.
-            && !movement.is_on_floor();
+            && !movement.is_on_stage();
 
         // Apply fastfall
         if just_started_fastfalling {
@@ -187,7 +239,7 @@ fn character_movement(
         }
 
         // Remove fasfall
-        if movement.is_on_floor() {
+        if movement.is_on_stage() {
             movement.is_fastfalling = false;
         }
 
@@ -204,11 +256,19 @@ fn character_movement(
         movement.was_fastfalling_last_frame = movement.is_fastfalling;
 
         // Jump
-        let gonna_inevitably_walljump =
-            movement.stage_touch_force.x * movement.x > 0. && movement.is_on_wall();
+        let gonna_inevitably_walljump = movement.stage_touch_force.x * movement.x > 0.
+            && movement.walljump_direction * movement.x <= 0.
+            && movement.can_walljump;
 
-        if movement.wants_to_jump && movement.current_air_jumps > 0 || gonna_inevitably_walljump {
-            if movement.is_on_air() {
+        // This is done in order to track direction of the wall that was jumped in order
+        // to replicate the behavior in smash
+        // (walls with the same direction cannot be jumped twice in a row)
+        if gonna_inevitably_walljump {
+            movement.walljump_direction = movement.x;
+        }
+
+        if (movement.wants_to_jump && movement.current_air_jumps > 0) || gonna_inevitably_walljump {
+            if movement.is_not_touching_stage() {
                 movement.current_air_jumps -= 1;
             }
             vel.linvel.y = movement.jump_boost;
@@ -223,15 +283,88 @@ fn character_movement(
             vel.linvel.x = movement.x * movement.speed_floor;
         }
 
-        // reset the variable
+        // reset the variables
         movement.wants_to_jump = false;
+        if movement.is_on_stage() {
+            movement.current_air_jumps = movement.max_air_jumps;
+            movement.walljump_direction = 0.;
+        }
     }
 }
 
-fn character_information_update(mut character_query: Query<&mut CharacterMovement>) {
-    for mut character in character_query.iter_mut() {
-        if character.is_on_floor() {
-            character.current_air_jumps = character.max_air_jumps;
+fn attack_system(
+    mut attack: Query<&mut CharacterAttack>,
+    mut attacked: Query<(Entity, &mut Character)>,
+    mut collision_event: EventReader<CollisionEvent>,
+) {
+    for collision in collision_event.iter() {
+        if let CollisionEvent::Started(col1, col2, _) = collision {
+            let (attacked_entity, mut attacked_character) = match attacked.get_mut(*col2) {
+                Ok(uwu) => uwu,
+                Err(_) => {
+                    continue;
+                }
+            };
+            let mut attack = attack.get_mut(*col1).unwrap();
+
+            if attack.has_attacked.contains(&attacked_entity) {
+                continue;
+            }
+            dbg!(collision);
+
+            // Change code if stupid
+            attacked_character.percentage += attack.damage;
+
+            attack.has_attacked.push(attacked_entity);
+        }
+    }
+}
+
+fn character_attack(
+    mut character: Query<(Entity, &mut CharacterAttackController)>,
+    children: Query<(Entity, &Parent), With<CharacterAttack>>,
+    time: Res<Time>,
+    mut commands: Commands,
+) {
+    for (entity, mut character) in character.iter_mut() {
+        let mut just_finished_attack = false;
+
+        if let Some(timer) = &mut character.attack_timer {
+            just_finished_attack = timer.finished();
+            timer.tick(time.delta());
+        }
+
+        if just_finished_attack {
+            character.attack_timer = None;
+
+            for (child, parent) in children.iter() {
+                if entity == parent.get() {
+                    commands.entity(child).despawn_recursive();
+                }
+            }
+        }
+
+        if character.is_attacking() {
+            character.wants_to_forward_air = false;
+            continue;
+        }
+
+        if character.wants_to_forward_air {
+            character.attack_timer = Some(Timer::from_seconds(1., TimerMode::Once));
+
+            let attack_entity = commands
+                .spawn((
+                    Collider::cuboid(100., 100.),
+                    Sensor,
+                    CharacterAttack {
+                        damage: 20.,
+                        ..default()
+                    },
+                    ActiveEvents::COLLISION_EVENTS,
+                ))
+                .id();
+
+            commands.entity(entity).add_child(attack_entity);
         }
     }
 }

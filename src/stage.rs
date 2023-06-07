@@ -27,5 +27,9 @@ fn setup_stage(mut commands: Commands) {
         Collider::cuboid(500., 500.),
         Stage,
         ActiveEvents::CONTACT_FORCE_EVENTS,
+        CollisionGroups::new(
+            Group::from_bits(0b1).unwrap(),
+            Group::from_bits(0b11).unwrap(),
+        ),
     ));
 }

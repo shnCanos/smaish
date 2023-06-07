@@ -4,7 +4,7 @@ use leafwing_input_manager::prelude::*;
 
 use crate::camera::CameraFollows;
 
-use super::{CharacterBundle, CharacterMovement};
+use super::{CharacterAttack, CharacterAttackController, CharacterBundle, CharacterMovement};
 
 const FASTFALL_THRESHOLD: f32 = 0.5;
 // How fast you need to move the stick to fastfall
@@ -40,8 +40,25 @@ enum PlayerActions {
 fn setup_player(mut commands: Commands, asset_server: Res<AssetServer>) {
     let character = CharacterBundle {
         grav: GravityScale(20.),
+        damping: Damping {
+            linear_damping: 1.,
+            ..Default::default()
+        },
+        // mass: ColliderMassProperties::Mass(200.),
         ..default()
     };
+
+    // let hitbox = commands
+    //     .spawn((
+    //         Collider::cuboid(100., 100.),
+    //         Sensor,
+    //         CharacterAttack {
+    //             damage: 20.,
+    //             has_attacked: Vec::new(),
+    //         },
+    //         ActiveEvents::COLLISION_EVENTS,
+    //     ))
+    //     .id();
 
     commands.spawn((
         SpriteBundle {
@@ -53,12 +70,14 @@ fn setup_player(mut commands: Commands, asset_server: Res<AssetServer>) {
             ..default()
         },
         RigidBody::Dynamic,
-        Player,
         Collider::cuboid(50., 50.),
+        Player,
         LockedAxes::ROTATION_LOCKED,
-        character.clone(),
+        character,
         CameraFollows { padding: 250 },
+        Name::new("Bandana dee (player)"),
     ));
+    // .add_child(hitbox);
 
     commands
         .spawn(InputManagerBundle::<PlayerActions> {
@@ -74,12 +93,23 @@ fn setup_player(mut commands: Commands, asset_server: Res<AssetServer>) {
             .insert(DualAxis::left_stick(), PlayerActions::MoveStick)
             .insert(GamepadButtonType::West, PlayerActions::Jump)
             .insert(GamepadButtonType::North, PlayerActions::Jump)
+            .insert(GamepadButtonType::East, PlayerActions::NormalAttack)
             .build(),
         })
         .insert(Player);
 }
 
 fn setup_dummy(mut commands: Commands, asset_server: Res<AssetServer>) {
+    let character = CharacterBundle {
+        grav: GravityScale(20.),
+        damping: Damping {
+            linear_damping: 1.,
+            ..Default::default()
+        },
+        // mass: ColliderMassProperties::Mass(200.),
+        ..default()
+    };
+
     commands.spawn((
         SpriteBundle {
             sprite: Sprite {
@@ -92,23 +122,24 @@ fn setup_dummy(mut commands: Commands, asset_server: Res<AssetServer>) {
         RigidBody::Dynamic,
         Collider::cuboid(25., 25.),
         LockedAxes::ROTATION_LOCKED,
-        CharacterBundle::default(),
+        character,
         CameraFollows { padding: 250 },
+        Name::new("Bandana dee (dummy)"),
     ));
 }
 
 fn player_movement(
     action_state_query: Query<&ActionState<PlayerActions>, With<Player>>,
-    mut player_query: Query<&mut CharacterMovement, With<Player>>,
+    mut player_query: Query<(&mut CharacterAttackController, &mut CharacterMovement), With<Player>>,
     mut last_stick_position: Local<f32>,
     time: Res<Time>,
 ) {
     // Controller Movement
-    let action_state = action_state_query.single();
+    let action_state: &ActionState<PlayerActions> = action_state_query.single();
     let axis_pair = action_state
         .clamped_axis_pair(PlayerActions::MoveStick)
         .unwrap();
-    let mut movement = player_query.single_mut();
+    let (mut attack, mut movement) = player_query.single_mut();
 
     if action_state.pressed(PlayerActions::MoveStick) {
         // Sides
@@ -147,5 +178,10 @@ fn player_movement(
     // Jump
     if action_state.just_pressed(PlayerActions::Jump) {
         movement.jump()
+    }
+
+    // Attack
+    if action_state.just_pressed(PlayerActions::NormalAttack) {
+        attack.forward_air();
     }
 }
