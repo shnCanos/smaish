@@ -24,7 +24,6 @@ pub struct CharacterBundle {
     pub vel: Velocity,
     pub grav: GravityScale,
     pub damping: Damping,
-    pub mass: ColliderMassProperties,
     pub kincharcont: KinematicCharacterController,
     pub attacks: CharacterAttackController,
 }
@@ -208,22 +207,14 @@ fn character_movement(
         if movement.is_on_stage() {
             vel.linvel.x = movement.x * movement.speed_floor;
         } else {
-            // Using the same thing as in 2 lines above makes the feel very awkward
+            // Using the same thing as in 2 lines above makes the movement feel very awkward
             vel.linvel.x = (vel.linvel.x + movement.x * movement.speed_air)
                 .clamp(-movement.max_speed_air, movement.max_speed_air);
-
-            vel.linvel += attack_controller.velocity_from_knockback;
         }
 
-        attack_controller.velocity_from_knockback.x +=
-            -(attack_controller.velocity_from_knockback.x.abs()
-                / attack_controller.velocity_from_knockback.x)
-                * 1.;
-
-        attack_controller.velocity_from_knockback.y +=
-            -(attack_controller.velocity_from_knockback.y.abs()
-                / attack_controller.velocity_from_knockback.y)
-                * 1.;
+        // Knockback
+        vel.linvel += attack_controller.velocity_from_knockback;
+        attack_controller.velocity_from_knockback = Vec2::ZERO;
 
         // FastFall
         let just_started_fastfalling = !movement.was_fastfalling_last_frame
@@ -294,17 +285,18 @@ fn character_movement(
 
 fn attack_system(
     mut attack: Query<&mut CharacterAttack>,
-    mut attacked: Query<(Entity, &mut Character)>,
+    mut attacked: Query<(Entity, &mut Character, &mut CharacterAttackController)>,
     mut collision_event: EventReader<CollisionEvent>,
 ) {
     for collision in collision_event.iter() {
         if let CollisionEvent::Started(col1, col2, _) = collision {
-            let (attacked_entity, mut attacked_character) = match attacked.get_mut(*col2) {
-                Ok(uwu) => uwu,
-                Err(_) => {
-                    continue;
-                }
-            };
+            let (attacked_entity, mut attacked_character, mut attacked_controller) =
+                match attacked.get_mut(*col2) {
+                    Ok(uwu) => uwu,
+                    Err(_) => {
+                        continue;
+                    }
+                };
             let mut attack = attack.get_mut(*col1).unwrap();
 
             if attack.has_attacked.contains(&attacked_entity) {
@@ -314,6 +306,8 @@ fn attack_system(
 
             // Change code if stupid
             attacked_character.percentage += attack.damage;
+
+            attacked_controller.velocity_from_knockback += Vec2::new(0., 1000.);
 
             attack.has_attacked.push(attacked_entity);
         }
@@ -340,8 +334,10 @@ fn character_attack(
             for (child, parent) in children.iter() {
                 if entity == parent.get() {
                     commands.entity(child).despawn_recursive();
+                    break;
                 }
             }
+            break;
         }
 
         if character.is_attacking() {
@@ -361,6 +357,10 @@ fn character_attack(
                         ..default()
                     },
                     ActiveEvents::COLLISION_EVENTS,
+                    CollisionGroups::new(
+                        Group::from_bits(0b100).unwrap(),
+                        Group::from_bits(0b10).unwrap(),
+                    ),
                 ))
                 .id();
 

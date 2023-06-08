@@ -4,7 +4,7 @@ use leafwing_input_manager::prelude::*;
 
 use crate::camera::CameraFollows;
 
-use super::{CharacterAttack, CharacterAttackController, CharacterBundle, CharacterMovement};
+use super::{CharacterAttackController, CharacterBundle, CharacterMovement};
 
 const FASTFALL_THRESHOLD: f32 = 0.5;
 // How fast you need to move the stick to fastfall
@@ -76,6 +76,10 @@ fn setup_player(mut commands: Commands, asset_server: Res<AssetServer>) {
         character,
         CameraFollows { padding: 250 },
         Name::new("Bandana dee (player)"),
+        CollisionGroups::new(
+            Group::from_bits(0b10).unwrap(),
+            Group::from_bits(0b1).unwrap(),
+        ),
     ));
     // .add_child(hitbox);
 
@@ -103,7 +107,7 @@ fn setup_dummy(mut commands: Commands, asset_server: Res<AssetServer>) {
     let character = CharacterBundle {
         grav: GravityScale(20.),
         damping: Damping {
-            linear_damping: 1.,
+            linear_damping: 10.,
             ..Default::default()
         },
         // mass: ColliderMassProperties::Mass(200.),
@@ -125,6 +129,10 @@ fn setup_dummy(mut commands: Commands, asset_server: Res<AssetServer>) {
         character,
         CameraFollows { padding: 250 },
         Name::new("Bandana dee (dummy)"),
+        CollisionGroups::new(
+            Group::from_bits(0b10).unwrap(),
+            Group::from_bits(0b101).unwrap(),
+        ),
     ));
 }
 

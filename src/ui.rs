@@ -11,10 +11,10 @@ impl Plugin for UiPlugin {
     }
 }
 
-fn show_percentage(mut contexts: EguiContexts, character: Query<(&Name, &Character)>) {
+fn show_percentage(mut contexts: EguiContexts, character: Query<(&Name, &Character, &Transform)>) {
     egui::Window::new("Percetage").show(contexts.ctx_mut(), |ui| {
         for character in character.iter() {
-            ui.label(format!("{}: {}", character.0, character.1.percentage));
+            ui.label(format!("{}: {}%", character.0, character.1.percentage,));
         }
     });
 }

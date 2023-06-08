@@ -25,12 +25,7 @@ pub struct CameraFollows {
 }
 
 fn setup_camera(mut commands: Commands) {
-    commands.spawn((
-        Camera2dBundle {
-            ..Default::default()
-        },
-        MainGameCamera,
-    ));
+    commands.spawn((Camera2dBundle::default(), MainGameCamera));
 }
 
 fn camera_follows(

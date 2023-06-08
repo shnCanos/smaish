@@ -4,7 +4,7 @@ mod stage;
 mod ui;
 
 use bevy::prelude::*;
-use bevy_egui::{egui, EguiContexts, EguiPlugin};
+use bevy_egui::EguiPlugin;
 // use bevy_embedded_assets::EmbeddedAssetPlugin;
 use bevy::window::Window;
 use bevy_rapier2d::prelude::*;
