@@ -1,5 +1,7 @@
 use bevy::prelude::*;
 
+use crate::{editor::EditorOptions, GameStates};
+
 const ZOOMING_IN_CAMERA_LERP_SPEED: f32 = 0.01;
 const ZOOMING_OUT_CAMERA_LERP_SPEED: f32 = 0.8;
 
@@ -8,7 +10,8 @@ pub struct CameraPlugin;
 impl Plugin for CameraPlugin {
     fn build(&self, app: &mut App) {
         app.add_startup_system(setup_camera)
-            .add_system(camera_follows);
+            .add_system(camera_follows.in_set(OnUpdate(GameStates::Playing)))
+            .add_system(camera_editing.in_set(OnUpdate(GameStates::Editor)));
     }
 }
 
@@ -32,15 +35,16 @@ fn camera_follows(
     mut camera_query: Query<(&mut Transform, &mut OrthographicProjection), With<MainGameCamera>>,
     character_query: Query<(&Transform, &CameraFollows), Without<MainGameCamera>>,
     window: Query<&Window>,
+    options: Res<EditorOptions>,
 ) {
     let (mut camera_tf, mut camera_projection) = camera_query.single_mut();
     let window = window.single();
 
-    let mut character_translation_sum = Vec3::ZERO;
-
-    for (character_tf, _) in character_query.iter() {
-        character_translation_sum += character_tf.translation;
-    }
+    let character_translation_sum = character_query
+        .iter()
+        .fold(Vec3::ZERO, |ini, (character_tf, _)| {
+            ini + character_tf.translation
+        });
 
     let character_translation_average =
         character_translation_sum / character_query.iter().count() as f32;
@@ -66,10 +70,12 @@ fn camera_follows(
 
     let window_height = window.height();
     let window_width = window.width();
+
     let new_camera_scale = (max_distance_from_camera.0.abs().x * 2. / window_width)
         .max(max_distance_from_camera.0.abs().y * 2. / window_height)
         + max_distance_from_camera.1 / window_height.min(window_width);
 
+    // Lerp, in a nutshell
     camera_projection.scale = camera_projection.scale
         + (new_camera_scale - camera_projection.scale)
             * if new_camera_scale - camera_projection.scale < 0. {
@@ -77,4 +83,29 @@ fn camera_follows(
             } else {
                 ZOOMING_OUT_CAMERA_LERP_SPEED
             };
+}
+
+fn camera_editing(
+    mut camera_query: Query<(&mut Transform, &mut OrthographicProjection), With<MainGameCamera>>,
+    character_query: Query<(&Transform, &CameraFollows), Without<MainGameCamera>>,
+    window: Query<&Window>,
+    options: Res<EditorOptions>,
+) {
+    if options.editing_character.is_none() {
+        return; //TODO
+    }
+
+    let (mut camera_tf, mut camera_projection) = camera_query.single_mut();
+    let window = window.single();
+    let window_height = window.height();
+    let window_width = window.width();
+
+    let (tf, camera_follows) = character_query
+        .get(options.editing_character.unwrap())
+        .unwrap();
+
+    camera_tf.translation = tf.translation;
+
+    let max_distance_from_camera = camera_follows.padding * 2;
+    camera_projection.scale = max_distance_from_camera as f32 / window_height.min(window_width);
 }

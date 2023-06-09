@@ -44,21 +44,9 @@ fn setup_player(mut commands: Commands, asset_server: Res<AssetServer>) {
             linear_damping: 1.,
             ..Default::default()
         },
-        // mass: ColliderMassProperties::Mass(200.),
+        name: Name::new("Bandana dee (Player)"),
         ..default()
     };
-
-    // let hitbox = commands
-    //     .spawn((
-    //         Collider::cuboid(100., 100.),
-    //         Sensor,
-    //         CharacterAttack {
-    //             damage: 20.,
-    //             has_attacked: Vec::new(),
-    //         },
-    //         ActiveEvents::COLLISION_EVENTS,
-    //     ))
-    //     .id();
 
     commands.spawn((
         SpriteBundle {
@@ -75,13 +63,11 @@ fn setup_player(mut commands: Commands, asset_server: Res<AssetServer>) {
         LockedAxes::ROTATION_LOCKED,
         character,
         CameraFollows { padding: 250 },
-        Name::new("Bandana dee (player)"),
         CollisionGroups::new(
             Group::from_bits(0b10).unwrap(),
             Group::from_bits(0b1).unwrap(),
         ),
     ));
-    // .add_child(hitbox);
 
     commands
         .spawn(InputManagerBundle::<PlayerActions> {
@@ -107,10 +93,10 @@ fn setup_dummy(mut commands: Commands, asset_server: Res<AssetServer>) {
     let character = CharacterBundle {
         grav: GravityScale(20.),
         damping: Damping {
-            linear_damping: 10.,
+            linear_damping: 1.,
             ..Default::default()
         },
-        // mass: ColliderMassProperties::Mass(200.),
+        name: Name::new("Bandana dee (dummy)"),
         ..default()
     };
 
@@ -128,7 +114,6 @@ fn setup_dummy(mut commands: Commands, asset_server: Res<AssetServer>) {
         LockedAxes::ROTATION_LOCKED,
         character,
         CameraFollows { padding: 250 },
-        Name::new("Bandana dee (dummy)"),
         CollisionGroups::new(
             Group::from_bits(0b10).unwrap(),
             Group::from_bits(0b101).unwrap(),

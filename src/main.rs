@@ -1,5 +1,6 @@
 mod camera;
 mod character;
+mod editor;
 mod stage;
 mod ui;
 
@@ -14,6 +15,12 @@ fn setup_window(mut window: Query<&mut Window>) {
     window.title = "SUwUssy PeidrOwO".to_string();
     window.decorations = true; // So the SUwUssy PeidrOwO appears, of course
     window.mode = bevy::window::WindowMode::Windowed;
+}
+#[derive(States, PartialEq, Eq, Debug, Clone, Hash, Default)]
+enum GameStates {
+    #[default]
+    Playing,
+    Editor,
 }
 
 fn main() {
@@ -30,6 +37,8 @@ fn main() {
         .add_plugin(stage::StagePlugin)
         .add_plugin(character::CharacterPlugin)
         .add_plugin(ui::UiPlugin)
+        .add_plugin(editor::EditorPlugin)
+        .add_state::<GameStates>()
         // .add_plugin(WorldInspectorPlugin::new())
         .run();
 }

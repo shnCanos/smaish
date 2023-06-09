@@ -1,7 +1,8 @@
 mod player;
 
-use bevy::prelude::*;
+use bevy::{prelude::*, utils::HashMap};
 use bevy_rapier2d::prelude::*;
+use serde::{Deserialize, Serialize};
 
 use crate::stage::Stage;
 
@@ -26,6 +27,7 @@ pub struct CharacterBundle {
     pub damping: Damping,
     pub kincharcont: KinematicCharacterController,
     pub attacks: CharacterAttackController,
+    pub name: Name,
 }
 
 #[derive(Component, Debug, Clone, Default)]
@@ -33,7 +35,14 @@ pub struct Character {
     pub percentage: f32,
 }
 
-#[derive(Component, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
+enum PossibleValues {
+    F32(f32),
+    Usize(usize),
+    Bool(bool),
+}
+
+#[derive(Serialize, Deserialize, Component, Debug, Clone)]
 pub struct CharacterMovement {
     // Constants
     pub speed_air: f32,
@@ -79,6 +88,7 @@ pub struct CharacterMovement {
 pub struct CharacterAttack {
     damage: f32,
     has_attacked: Vec<Entity>,
+    knockback: Vec2,
 }
 
 #[derive(Component, Debug, Clone, Default)]
@@ -291,23 +301,23 @@ fn attack_system(
     for collision in collision_event.iter() {
         if let CollisionEvent::Started(col1, col2, _) = collision {
             let (attacked_entity, mut attacked_character, mut attacked_controller) =
-                match attacked.get_mut(*col2) {
+                match attacked.get_mut(*col1) {
                     Ok(uwu) => uwu,
-                    Err(_) => {
-                        continue;
-                    }
+                    Err(_) => attacked.get_mut(*col2).unwrap(),
                 };
-            let mut attack = attack.get_mut(*col1).unwrap();
+            let mut attack = match attack.get_mut(*col1) {
+                Ok(uwu) => uwu,
+                Err(_) => attack.get_mut(*col2).unwrap(),
+            };
 
             if attack.has_attacked.contains(&attacked_entity) {
                 continue;
             }
-            dbg!(collision);
 
             // Change code if stupid
             attacked_character.percentage += attack.damage;
 
-            attacked_controller.velocity_from_knockback += Vec2::new(0., 1000.);
+            attacked_controller.velocity_from_knockback += attack.knockback;
 
             attack.has_attacked.push(attacked_entity);
         }
@@ -354,6 +364,7 @@ fn character_attack(
                     Sensor,
                     CharacterAttack {
                         damage: 20.,
+                        knockback: Vec2::splat(500.),
                         ..default()
                     },
                     ActiveEvents::COLLISION_EVENTS,
